@@ -40,7 +40,13 @@ echo "Текст установлен."
 if [ -f "$here/data.win" ]; then
   [ -f "$woh/data.win.orig_backup" ] || { cp -f "$woh/data.win" "$woh/data.win.orig_backup"; echo "Резервная копия data.win создана."; }
   cp -f "$here/data.win" "$woh/data.win"; echo "Картинки/шрифты (data.win) установлены."
+elif [ -f "$here/images/patch_images.sh" ]; then
+  read -r -p "Также применить картинки/шрифты? Пропатчит data.win (скачает UndertaleModCli). [y/N] " ans
+  case "${ans:-}" in
+    [yYдД]*) bash "$here/images/patch_images.sh" "$woh" || echo "Патч картинок не удался — текст уже установлен." ;;
+    *) echo "Картинки/шрифты пропущены (текст установлен)." ;;
+  esac
 else
-  echo "data.win в пакете нет — картинки/шрифты останутся английскими (нормально для текстовой версии)."
+  echo "Инструментов патча нет — картинки/шрифты останутся английскими."
 fi
 echo "Готово. Запускайте игру."

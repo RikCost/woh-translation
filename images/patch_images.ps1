@@ -1,23 +1,19 @@
-<#
-  patch_images.ps1 — патчит data.win переведёнными картинками и шрифтами (Windows).
-  ПРОТОТИП: перед применением делается резервная копия data.win.orig_backup.
+﻿<#
+  patch_images.ps1 — патчит data.win переведёнными картинками/шрифтами (Windows).
+  UndertaleModCli ищется в UMT_CLI / PATH / локальном кэше, иначе СКАЧИВАЕТСЯ
+  автоматически (self-contained сборка из релизов UndertaleModTool).
+  Перед патчем делается резервная копия data.win.orig_backup.
 
-  Нужен UndertaleModCli (CLI-сборка UndertaleModTool):
-    https://github.com/UnderminersTeam/UndertaleModTool/releases
-  Укажите путь через -UmtCli или переменную окружения UMT_CLI, либо положите
-  UndertaleModCli(.exe) в PATH.
-
-  Пример:
-    powershell -ExecutionPolicy Bypass -File patch_images.ps1 -UmtCli "C:\umt\UndertaleModCli.exe"
+  Запуск:  powershell -ExecutionPolicy Bypass -File patch_images.ps1 [-GameDir "...\WOH"]
 #>
 param(
-  [string]$UmtCli = $env:UMT_CLI,
-  [string]$GameDir = ""
+  [string]$GameDir = "",
+  [string]$UmtCli = $env:UMT_CLI
 )
 $ErrorActionPreference = "Stop"
-$here   = Split-Path -Parent $MyInvocation.MyCommand.Path
-$img    = (Resolve-Path (Join-Path $here "..\img")).Path
-$font   = (Resolve-Path (Join-Path $here "..\font")).Path
+$here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$img  = (Resolve-Path (Join-Path $here "..\img")).Path
+$font = (Resolve-Path (Join-Path $here "..\font")).Path
 $script = Join-Path $here "woh_patch.csx"
 
 function Get-WohDir {
@@ -33,6 +29,26 @@ function Get-WohDir {
   return $null
 }
 
+function Ensure-Cli {
+  if ($UmtCli -and (Test-Path $UmtCli)) { return $UmtCli }
+  $c = Get-Command UndertaleModCli -ErrorAction SilentlyContinue
+  if ($c) { return $c.Source }
+  $cache = Join-Path $here ".umtcli"
+  $exe = Get-ChildItem $cache -Recurse -Filter "UndertaleModCli.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($exe) { return $exe.FullName }
+  Write-Host "UndertaleModCli не найден — скачиваю (Windows)..." -f Cyan
+  New-Item -ItemType Directory -Force $cache | Out-Null
+  $rel = Invoke-RestMethod "https://api.github.com/repos/UnderminersTeam/UndertaleModTool/releases/latest"
+  $asset = $rel.assets | Where-Object { $_.name -match "Windows" -and $_.name -match "cli" } | Select-Object -First 1
+  if (-not $asset) { throw "Не нашёл ассет CLI (Windows) в последнем релизе." }
+  $zip = Join-Path $cache "cli.zip"
+  Invoke-WebRequest $asset.browser_download_url -OutFile $zip
+  Expand-Archive $zip $cache -Force
+  $exe = Get-ChildItem $cache -Recurse -Filter "UndertaleModCli.exe" | Select-Object -First 1
+  if (-not $exe) { throw "UndertaleModCli.exe не найден в архиве." }
+  return $exe.FullName
+}
+
 if (-not $GameDir) { $GameDir = Get-WohDir }
 if (-not $GameDir) { $GameDir = Read-Host "Не нашёл игру. Укажите путь к папке WOH" }
 $dataWin = Join-Path $GameDir "data.win"
@@ -41,19 +57,12 @@ if (-not (Test-Path $dataWin)) { throw "data.win не найден: $dataWin" }
 $bak = "$dataWin.orig_backup"
 if (-not (Test-Path $bak)) { Copy-Item $dataWin $bak -Force; Write-Host "Резервная копия: $bak" -f Green }
 
-if (-not $UmtCli) {
-  $c = Get-Command UndertaleModCli -ErrorAction SilentlyContinue
-  if ($c) { $UmtCli = $c.Source }
-}
-if (-not $UmtCli -or -not (Test-Path $UmtCli)) {
-  throw "UndertaleModCli не найден. Скачайте CLI-сборку UndertaleModTool и укажите -UmtCli путь или env UMT_CLI.`nhttps://github.com/UnderminersTeam/UndertaleModTool/releases"
-}
-
+$cli = Ensure-Cli
 $env:WOH_IMG_DIR  = $img
 $env:WOH_FONT_DIR = $font
 $out = "$dataWin.new"
-Write-Host "Патчим $dataWin (img: $img, font: $font)..." -f Cyan
-& $UmtCli load $dataWin -s $script -o $out -f -v
+Write-Host "Патчим data.win через: $cli" -f Cyan
+& $cli load $dataWin -s $script -o $out -f -v
 if ($LASTEXITCODE -ne 0) { throw "UndertaleModCli завершился с ошибкой $LASTEXITCODE" }
 Move-Item $out $dataWin -Force
 Write-Host "Готово: data.win пропатчен. Откат — вернуть $bak." -f Green

@@ -1,4 +1,4 @@
-<#
+﻿<#
   Удаление русификатора WORLD OF HORROR (Windows): восстановление из резервных копий.
 #>
 $ErrorActionPreference = "Stop"

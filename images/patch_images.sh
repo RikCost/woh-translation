@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 # patch_images.sh — патчит data.win переведёнными картинками/шрифтами (Linux/macOS/Deck).
-# ПРОТОТИП: перед применением делается резервная копия data.win.orig_backup.
+# UndertaleModCli ищется в UMT_CLI / PATH / локальном кэше, иначе СКАЧИВАЕТСЯ
+# автоматически (self-contained сборка из релизов UndertaleModTool).
+# Перед патчем делается резервная копия data.win.orig_backup.
 #
-# Нужен UndertaleModCli (CLI-сборка UndertaleModTool):
-#   https://github.com/UnderminersTeam/UndertaleModTool/releases
-# Укажите команду через переменную UMT_CLI, напр.:
-#   UMT_CLI="dotnet /path/UndertaleModCli.dll" bash patch_images.sh
-#   UMT_CLI="/path/UndertaleModCli"            bash patch_images.sh
-# Либо положите UndertaleModCli в PATH.
+# Запуск:  bash patch_images.sh [путь_к_папке_WOH]
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 img="$(cd "$here/../img" && pwd)"
@@ -33,25 +30,39 @@ find_woh() {
   done
 }
 
+# echo-ит путь к исполняемому UndertaleModCli (скачивает при необходимости)
+ensure_cli() {
+  if [ -n "${UMT_CLI:-}" ]; then echo "$UMT_CLI"; return; fi
+  if command -v UndertaleModCli >/dev/null 2>&1; then echo "UndertaleModCli"; return; fi
+  local cache="$here/.umtcli" exe
+  exe="$(find "$cache" -type f -name UndertaleModCli 2>/dev/null | head -1 || true)"
+  if [ -n "${exe:-}" ]; then chmod +x "$exe"; echo "$exe"; return; fi
+  local kw; case "$(uname -s)" in Darwin) kw="macOS";; *) kw="Ubuntu";; esac
+  echo "UndertaleModCli не найден — скачиваю ($kw)..." >&2
+  mkdir -p "$cache"
+  local url
+  url="$(curl -fsSL https://api.github.com/repos/UnderminersTeam/UndertaleModTool/releases/latest \
+        | grep -oE '"browser_download_url"[: ]*"[^"]*'"$kw"'[^"]*\.zip"' \
+        | sed -E 's/.*"(https[^"]+)".*/\1/' | head -1)"
+  [ -n "${url:-}" ] || { echo "Не нашёл ассет CLI ($kw) в последнем релизе." >&2; return 1; }
+  curl -fL "$url" -o "$cache/cli.zip" >&2
+  if command -v unzip >/dev/null 2>&1; then (cd "$cache" && unzip -oq cli.zip)
+  elif command -v python3 >/dev/null 2>&1; then python3 -c "import zipfile,sys;zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$cache/cli.zip" "$cache"
+  else echo "Нужен unzip или python3 для распаковки." >&2; return 1; fi
+  exe="$(find "$cache" -type f -name UndertaleModCli | head -1 || true)"
+  [ -n "${exe:-}" ] || { echo "UndertaleModCli не найден в архиве." >&2; return 1; }
+  chmod +x "$exe"; echo "$exe"
+}
+
 woh="${1:-$(find_woh || true)}"
 [ -n "${woh:-}" ] || read -r -p "Не нашёл игру. Укажите путь к папке WOH: " woh
 data="$woh/data.win"
 [ -f "$data" ] || { echo "data.win не найден: $data"; exit 1; }
+bak="$data.orig_backup"; [ -f "$bak" ] || { cp -f "$data" "$bak"; echo "Резервная копия: $bak"; }
 
-bak="$data.orig_backup"
-[ -f "$bak" ] || { cp -f "$data" "$bak"; echo "Резервная копия: $bak"; }
-
-# команда CLI
-cli="${UMT_CLI:-}"
-if [ -z "$cli" ]; then
-  if command -v UndertaleModCli >/dev/null 2>&1; then cli="UndertaleModCli"; fi
-fi
-[ -n "$cli" ] || { echo "UndertaleModCli не найден. Задайте UMT_CLI (см. шапку скрипта)."; exit 1; }
-
-export WOH_IMG_DIR="$img"
-export WOH_FONT_DIR="$font"
-echo "Патчим $data (img: $img, font: $font)..."
-# shellcheck disable=SC2086
-$cli load "$data" -s "$script" -o "$data.new" -f -v
+cli="$(ensure_cli)"
+export WOH_IMG_DIR="$img" WOH_FONT_DIR="$font"
+echo "Патчим data.win через: $cli"
+"$cli" load "$data" -s "$script" -o "$data.new" -f -v
 mv -f "$data.new" "$data"
 echo "Готово: data.win пропатчен. Откат — вернуть $bak."
