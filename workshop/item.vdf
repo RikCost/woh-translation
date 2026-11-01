@@ -1,0 +1,17 @@
+// Шаблон для steamcmd +workshop_build_item (appid 913740 — WORLD OF HORROR).
+// publishedfileid = 0  ->  попытка создать НОВЫЙ предмет.
+// После первой публикации впишите сюда реальный ID (его также выдаёт
+// встроенный публикатор игры), чтобы последующие запуски ОБНОВЛЯЛИ тот же предмет.
+// Полное описание не держим здесь — вставляем из description_ru.txt на странице.
+// visibility: 0=public, 1=friends, 2=private/hidden (для теста), 3=unlisted.
+"workshopitem"
+{
+	"appid"		"913740"
+	"publishedfileid"	"0"
+	"contentfolder"		"D:\\1\\mi\\woh-translation\\workshop\\content"
+	"previewfile"		"D:\\1\\mi\\woh-translation\\workshop\\preview.png"
+	"visibility"		"2"
+	"title"			"Полная русская локализация (Russian localization)"
+	"description"		"Полный перевод WORLD OF HORROR на русский язык (текст). Подробности и установка — в описании на странице. Версия 2.0.0, игра 1.2."
+	"changenote"		"2.0.0 — перевод для игры 1.2."
+}
