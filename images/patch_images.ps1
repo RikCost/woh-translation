@@ -1,19 +1,16 @@
 ﻿<#
-  patch_images.ps1 — патчит data.win переведёнными картинками/шрифтами (Windows).
-  UndertaleModCli ищется в UMT_CLI / PATH / локальном кэше, иначе СКАЧИВАЕТСЯ
-  автоматически (self-contained сборка из релизов UndertaleModTool).
+  patch_images.ps1 — ставит переведённые КАРТИНКИ в data.win (Windows).
+  Метод: спрайты заменяются in-place (QOI), страницы атласа со шрифтами
+  пропускаются (иначе ломается текст). Шрифты не трогаются.
+  Требуется nightly-сборка UndertaleModCli — скачивается автоматически.
   Перед патчем делается резервная копия data.win.orig_backup.
 
   Запуск:  powershell -ExecutionPolicy Bypass -File patch_images.ps1 [-GameDir "...\WOH"]
 #>
-param(
-  [string]$GameDir = "",
-  [string]$UmtCli = $env:UMT_CLI
-)
+param([string]$GameDir = "", [string]$UmtCli = $env:UMT_CLI)
 $ErrorActionPreference = "Stop"
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $img  = (Resolve-Path (Join-Path $here "..\img")).Path
-$font = (Resolve-Path (Join-Path $here "..\font")).Path
 $script = Join-Path $here "woh_patch.csx"
 
 function Get-WohDir {
@@ -31,16 +28,14 @@ function Get-WohDir {
 
 function Ensure-Cli {
   if ($UmtCli -and (Test-Path $UmtCli)) { return $UmtCli }
-  $c = Get-Command UndertaleModCli -ErrorAction SilentlyContinue
-  if ($c) { return $c.Source }
-  $cache = Join-Path $here ".umtcli"
+  $cache = Join-Path $here ".utmt_nightly"
   $exe = Get-ChildItem $cache -Recurse -Filter "UndertaleModCli.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($exe) { return $exe.FullName }
-  Write-Host "UndertaleModCli не найден — скачиваю (Windows)..." -f Cyan
+  Write-Host "Скачиваю UndertaleModCli (nightly)..." -f Cyan
   New-Item -ItemType Directory -Force $cache | Out-Null
-  $rel = Invoke-RestMethod "https://api.github.com/repos/UnderminersTeam/UndertaleModTool/releases/latest"
-  $asset = $rel.assets | Where-Object { $_.name -match "Windows" -and $_.name -match "cli" } | Select-Object -First 1
-  if (-not $asset) { throw "Не нашёл ассет CLI (Windows) в последнем релизе." }
+  $rel = Invoke-RestMethod "https://api.github.com/repos/UnderminersTeam/UndertaleModTool/releases/tags/nightly"
+  $asset = $rel.assets | Where-Object { $_.name -match "CLI" -and $_.name -match "windows" } | Select-Object -First 1
+  if (-not $asset) { throw "Не нашёл nightly-ассет CLI (windows)." }
   $zip = Join-Path $cache "cli.zip"
   Invoke-WebRequest $asset.browser_download_url -OutFile $zip
   Expand-Archive $zip $cache -Force
@@ -58,11 +53,10 @@ $bak = "$dataWin.orig_backup"
 if (-not (Test-Path $bak)) { Copy-Item $dataWin $bak -Force; Write-Host "Резервная копия: $bak" -f Green }
 
 $cli = Ensure-Cli
-$env:WOH_IMG_DIR  = $img
-$env:WOH_FONT_DIR = $font
+$env:WOH_IMG_DIR = $img
 $out = "$dataWin.new"
-Write-Host "Патчим data.win через: $cli" -f Cyan
-& $cli load $dataWin -s $script -o $out -f -v
+Write-Host "Патчу картинки через: $cli" -f Cyan
+& $cli load $dataWin -s $script -o $out -f
 if ($LASTEXITCODE -ne 0) { throw "UndertaleModCli завершился с ошибкой $LASTEXITCODE" }
 Move-Item $out $dataWin -Force
-Write-Host "Готово: data.win пропатчен. Откат — вернуть $bak." -f Green
+Write-Host "Готово: картинки применены. Откат — вернуть $bak." -f Green

@@ -1,3 +1,4 @@
 # скачанный UndertaleModCli и временные файлы
 .umtcli/
+.utmt_nightly/
 *.zip

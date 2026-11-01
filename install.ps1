@@ -44,8 +44,16 @@ if (Test-Path $dw) {
   if (-not (Test-Path $dwBak)) { Copy-Item (Join-Path $woh "data.win") $dwBak -Force; Write-Host "Резервная копия data.win создана." }
   Copy-Item $dw (Join-Path $woh "data.win") -Force
   Write-Host "Картинки/шрифты (data.win) установлены." -f Green
+} elseif (Test-Path $patch) {
+  $do = $Images
+  if (-not $Images -and -not $NoImages) {
+    $ans = Read-Host "Также применить переведённые КАРТИНКИ? Пропатчит data.win, скачает UndertaleModCli (~130 МБ). [y/N]"
+    $do = ($ans -match '^(y|Y|д|Д)')
+  }
+  if ($do) { try { & $patch -GameDir $woh } catch { Write-Host "Патч картинок не удался — текст уже установлен. $_" -f Yellow } }
+  else { Write-Host "Картинки пропущены (установлен только текст)." -f Yellow }
 } else {
-  Write-Host "Картинки/шрифты НЕ применяются: патч data.win экспериментальный и ЛОМАЕТ игру (см. images\README_IMAGES.md). Установлен только текст." -f Yellow
+  Write-Host "Инструментов патча картинок нет — установлен только текст." -f Yellow
 }
 Write-Host "Готово. В игре выберите язык English (это и есть русский)." -f Green
 if ($Host.Name -eq "ConsoleHost") { pause }

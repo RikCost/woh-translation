@@ -40,7 +40,13 @@ echo "Текст установлен."
 if [ -f "$here/data.win" ]; then
   [ -f "$woh/data.win.orig_backup" ] || { cp -f "$woh/data.win" "$woh/data.win.orig_backup"; echo "Резервная копия data.win создана."; }
   cp -f "$here/data.win" "$woh/data.win"; echo "Картинки/шрифты (data.win) установлены."
+elif [ -f "$here/images/patch_images.sh" ]; then
+  read -r -p "Также применить переведённые КАРТИНКИ? Пропатчит data.win, скачает UndertaleModCli (~130 МБ). [y/N] " ans
+  case "${ans:-}" in
+    [yYдД]*) bash "$here/images/patch_images.sh" "$woh" || echo "Патч картинок не удался — текст уже установлен." ;;
+    *) echo "Картинки пропущены (установлен только текст)." ;;
+  esac
 else
-  echo "Картинки/шрифты НЕ применяются: патч data.win экспериментальный и ЛОМАЕТ игру (см. images/README_IMAGES.md). Установлен только текст."
+  echo "Инструментов патча картинок нет — установлен только текст."
 fi
 echo "Готово. В игре выберите язык English (это и есть русский)."

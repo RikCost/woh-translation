@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# patch_images.sh — патчит data.win переведёнными картинками/шрифтами (Linux/macOS/Deck).
-# UndertaleModCli ищется в UMT_CLI / PATH / локальном кэше, иначе СКАЧИВАЕТСЯ
-# автоматически (self-contained сборка из релизов UndertaleModTool).
-# Перед патчем делается резервная копия data.win.orig_backup.
-#
-# Запуск:  bash patch_images.sh [путь_к_папке_WOH]
+# patch_images.sh — ставит переведённые КАРТИНКИ в data.win (Linux/macOS/Deck).
+# Метод: спрайты in-place (QOI), страницы атласа со шрифтами пропускаются
+# (иначе ломается текст). Шрифты не трогаются. Нужна nightly-сборка
+# UndertaleModCli — скачивается автоматически. Делается бэкап data.win.orig_backup.
+#   bash patch_images.sh [путь_к_папке_WOH]
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 img="$(cd "$here/../img" && pwd)"
-font="$(cd "$here/../font" && pwd)"
 script="$here/woh_patch.csx"
 
 find_woh() {
@@ -30,25 +28,23 @@ find_woh() {
   done
 }
 
-# echo-ит путь к исполняемому UndertaleModCli (скачивает при необходимости)
 ensure_cli() {
   if [ -n "${UMT_CLI:-}" ]; then echo "$UMT_CLI"; return; fi
-  if command -v UndertaleModCli >/dev/null 2>&1; then echo "UndertaleModCli"; return; fi
-  local cache="$here/.umtcli" exe
+  local cache="$here/.utmt_nightly" exe
   exe="$(find "$cache" -type f -name UndertaleModCli 2>/dev/null | head -1 || true)"
   if [ -n "${exe:-}" ]; then chmod +x "$exe"; echo "$exe"; return; fi
-  local kw; case "$(uname -s)" in Darwin) kw="macOS";; *) kw="Ubuntu";; esac
-  echo "UndertaleModCli не найден — скачиваю ($kw)..." >&2
+  local kw; case "$(uname -s)" in Darwin) kw="macOS";; *) kw="ubuntu";; esac
+  echo "Скачиваю UndertaleModCli (nightly, $kw)..." >&2
   mkdir -p "$cache"
   local url
-  url="$(curl -fsSL https://api.github.com/repos/UnderminersTeam/UndertaleModTool/releases/latest \
-        | grep -oE '"browser_download_url"[: ]*"[^"]*'"$kw"'[^"]*\.zip"' \
+  url="$(curl -fsSL https://api.github.com/repos/UnderminersTeam/UndertaleModTool/releases/tags/nightly \
+        | grep -oE '"browser_download_url"[: ]*"[^"]*CLI[^"]*'"$kw"'[^"]*\.zip"' \
         | sed -E 's/.*"(https[^"]+)".*/\1/' | head -1)"
-  [ -n "${url:-}" ] || { echo "Не нашёл ассет CLI ($kw) в последнем релизе." >&2; return 1; }
+  [ -n "${url:-}" ] || { echo "Не нашёл nightly-ассет CLI ($kw)." >&2; return 1; }
   curl -fL "$url" -o "$cache/cli.zip" >&2
   if command -v unzip >/dev/null 2>&1; then (cd "$cache" && unzip -oq cli.zip)
   elif command -v python3 >/dev/null 2>&1; then python3 -c "import zipfile,sys;zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$cache/cli.zip" "$cache"
-  else echo "Нужен unzip или python3 для распаковки." >&2; return 1; fi
+  else echo "Нужен unzip или python3." >&2; return 1; fi
   exe="$(find "$cache" -type f -name UndertaleModCli | head -1 || true)"
   [ -n "${exe:-}" ] || { echo "UndertaleModCli не найден в архиве." >&2; return 1; }
   chmod +x "$exe"; echo "$exe"
@@ -61,8 +57,8 @@ data="$woh/data.win"
 bak="$data.orig_backup"; [ -f "$bak" ] || { cp -f "$data" "$bak"; echo "Резервная копия: $bak"; }
 
 cli="$(ensure_cli)"
-export WOH_IMG_DIR="$img" WOH_FONT_DIR="$font"
-echo "Патчим data.win через: $cli"
-"$cli" load "$data" -s "$script" -o "$data.new" -f -v
+export WOH_IMG_DIR="$img"
+echo "Патчу картинки через: $cli"
+"$cli" load "$data" -s "$script" -o "$data.new" -f
 mv -f "$data.new" "$data"
-echo "Готово: data.win пропатчен. Откат — вернуть $bak."
+echo "Готово: картинки применены. Откат — вернуть $bak."
