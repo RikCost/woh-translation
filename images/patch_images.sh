@@ -10,8 +10,8 @@
 # Либо положите UndertaleModCli в PATH.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-img="$(cd "$here/../../img" && pwd)"
-font="$(cd "$here/../../font" && pwd)"
+img="$(cd "$here/../img" && pwd)"
+font="$(cd "$here/../font" && pwd)"
 script="$here/woh_patch.csx"
 
 find_woh() {

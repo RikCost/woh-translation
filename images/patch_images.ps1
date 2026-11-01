@@ -16,8 +16,8 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $here   = Split-Path -Parent $MyInvocation.MyCommand.Path
-$img    = (Resolve-Path (Join-Path $here "..\..\img")).Path
-$font   = (Resolve-Path (Join-Path $here "..\..\font")).Path
+$img    = (Resolve-Path (Join-Path $here "..\img")).Path
+$font   = (Resolve-Path (Join-Path $here "..\font")).Path
 $script = Join-Path $here "woh_patch.csx"
 
 function Get-WohDir {
