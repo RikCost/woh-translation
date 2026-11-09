@@ -14,7 +14,7 @@ Commands (each runs everything it needs):
                             (a successful build records the new ones); each --no-* skips its part; copies the changelog (the root file
                             whose name ends with "СПИСОК ИЗМЕНЕНИЙ") to output/; --bundle writes <version>.zip in the root: the wohrus installer (built from installer/ with cargo; it holds patches against the game's files), the changelog, the instructions text and THIRD-PARTY-NOTICE.md,
                             the version being the text before the first space of the changelog's name;
-                            the installer is built with the cargo profile PROFILE (default win-msvc-release) for the target TRIPLE (default: the host)
+                            the installer is built with the cargo profile PROFILE (default win-msvc-release on Windows, release elsewhere) for the target TRIPLE (default: the host)
     sync                   update the tracked translation documents from the game (the only command that writes to tracked files);
                             exe_strings.txt is not changed: new exe texts go to the exe_strings_candidates.txt report in the build cache
     hashes                 accept the current game files: record their hashes in hashes.txt (after a game update, once the translations of the changed files are checked)
@@ -103,7 +103,9 @@ forced = set()
 game = None  # the game folder
 skipped = set()  # build parts left out by --no-exe, --no-text, --no-sprites
 bundle = False  # with build: pack the installer
-cargo_profile = "win-msvc-release"  # cargo profile of the installer
+# cargo profile of the installer: the Windows release profile on Windows hosts, plain release (native) elsewhere,
+# so `build --bundle` on Linux/Steam Deck produces a native installer out of the box.
+cargo_profile = "win-msvc-release" if sys.platform == "win32" else "release"
 cargo_target = None  # cargo --target of the installer; None: the host
 command_args = []
 
@@ -663,7 +665,10 @@ def make_bundle(version, changelog_file):
     if cargo_target:
         release /= cargo_target
     release /= cargo_profile
-    suffix = ".exe" if sys.platform == "win32" else ""
+    # the built binary's extension follows the target OS, not the host: .exe for a Windows target (explicit --target
+    # or a Windows host without one), empty for Linux/Steam Deck
+    windows_out = "windows" in cargo_target if cargo_target else sys.platform == "win32"
+    suffix = ".exe" if windows_out else ""
     with tempfile.TemporaryDirectory() as tmp:
         installer = pathlib.Path(tmp) / f"wohrus{suffix}"
         notice = pathlib.Path(tmp) / "THIRD-PARTY-NOTICE.md"

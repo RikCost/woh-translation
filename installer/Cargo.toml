@@ -21,3 +21,8 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+# Named release profile for the Windows build (woh.py picks it on Windows hosts). Same settings as `release`;
+# a distinct name keeps its artifacts in their own target/ subdirectory. The Linux/Steam Deck build uses `release`.
+[profile.win-msvc-release]
+inherits = "release"
